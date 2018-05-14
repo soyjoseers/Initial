@@ -1,0 +1,215 @@
+package com.intento2.interfazgrafica;
+/**
+ * Created by raver1983 on 09/04/2016.
+ * ver ARG
+ */
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Vector;
+import javax.swing.table.DefaultTableColumnModel;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
+
+
+public class ConsultaVentaARG extends WindowAdapter implements ActionListener {
+    String nombre;
+    JFrame f_consultaventa = new JFrame("Consultar Venta");
+    ArrayList<String> listadeventas = new ArrayList<String>();
+    JComboBox cb_listadeventas;
+    JDialog d_numventa = new JDialog(f_consultaventa,"Numero de venta");
+    JPanel p_numventa = new JPanel(new GridLayout(2,1));
+
+    public void construirDialogo(Connection db) throws Exception{
+        Statement stmt=db.createStatement();
+        // Se usa distinct en la consulta para no repetir numeros de venta
+        ResultSet sst_ResultSet = stmt.executeQuery("SELECT DISTINCT V.No_Venta FROM VENTA AS V ORDER BY V.No_Venta");
+
+        while (sst_ResultSet.next()) {
+            listadeventas.add(sst_ResultSet.getString(1));
+        }
+        JComboBox cb_listadeventas = new JComboBox(listadeventas.toArray());
+        cb_listadeventas.setSelectedIndex(-1);
+        cb_listadeventas.addActionListener(this);
+        d_numventa.setLayout(new FlowLayout());
+        d_numventa.setBounds(300,150,250,100);
+        d_numventa.setResizable(false);
+        p_numventa.add(new Label("Numero de Venta"));
+        p_numventa.add(cb_listadeventas);
+        d_numventa.add(p_numventa);
+        d_numventa.pack();
+        d_numventa.addWindowListener(this);
+        d_numventa.setVisible(true);
+    }
+
+
+    public void ConsultaVentaARG (Connection db, String no_venta) throws Exception {
+        //String personatemp ="persona";
+        int i_aux; // Variable local para las consultas
+        Statement stmt = db.createStatement();// Para la primer consulta
+        Statement stmt2 = db.createStatement();// Para la segunda consulta
+        // Consulta 1 con JOIN
+        //
+        ResultSet sst_ResultSet = stmt.executeQuery("SELECT V.No_Venta, V.Fecha, V.Id_Client, C.Nombre, C.Dir, V.Id_Produ AS '# Producto', P.Descripcion, P.Precio, V.Cantidad, (P.Precio * V.Cantidad) AS Subtotal FROM VENTA AS V JOIN CLIENTE C ON V.Id_Client = C.Id_Cli JOIN PRODUCTOS P ON P.Id = V.Id_Produ  WHERE V.No_Venta = " + no_venta + " GROUP BY V.No_Venta, P.Descripcion");
+        ResultSetMetaData md = sst_ResultSet.getMetaData();// Se obtienen los metadatos de la consulta 1
+        int numero_columnas = md.getColumnCount();// Se obtiene el numero de columnas de la consulta anterior, que es 10 columnas
+        DefaultTableModel modelo = new DefaultTableModel();
+        JTable tabla = new JTable(modelo);
+
+        DefaultTableModel corona = new DefaultTableModel();
+        JTable nico = new JTable(corona);
+
+        String[] mio = new String[5];
+
+        //weas
+        //String[] nom_tab = new String[numero_columnas];
+
+        //corona.addColumn("Total");
+
+        // Ciclo para agregar nombres de columnas (headers) al modelo/ Wmode para llenar un registro con sus nombres
+        for (int i = 1; i <= numero_columnas; i++)
+        {
+            if(i==7 || i==8 || i==9 || i==10)
+                modelo.addColumn(md.getColumnName(i));
+        }
+
+        // Se agrega una columna extra para el Total, serian 11 columnas
+        //modelo.addColumn("Total");
+        while (sst_ResultSet.next()) {
+            String[] papus = new String[numero_columnas];// Se suma la columna extra "Total" al numero de columnas, es decir 11 columnas
+            int cont_a=0;
+            for (i_aux = 1; i_aux <= numero_columnas; i_aux++)
+            {
+                if(i_aux==2)
+                    mio[1] = sst_ResultSet.getString(i_aux);
+                else
+                if(i_aux==3)
+                    mio[2] = sst_ResultSet.getString(i_aux);
+                else
+                if(i_aux==4)
+                    mio[3] = sst_ResultSet.getString(i_aux);
+                else
+                if(i_aux==7 || i_aux==8 || i_aux==9 || i_aux==10)
+                {
+                    papus[cont_a] = sst_ResultSet.getString(i_aux);
+                    cont_a++;
+                }
+            }
+            modelo.addRow(papus);
+        }
+
+        // Consulta 2 para el total, se usa el resultset2 y el statement2 para no afectar la consulta 1
+        ResultSet sst_ResultSet2 = stmt2.executeQuery("SELECT SUM(P.Precio * V.Cantidad) FROM VENTA AS V JOIN PRODUCTOS P ON P.Id = V.Id_Produ  WHERE V.No_Venta = " + no_venta + " GROUP BY V.No_Venta");
+
+        /*while (sst_ResultSet2.next()) {
+                // Se usa la misma posicion i_aux-1 ya que i_aux sale del for anterior con valor de 11
+                papus[i_aux-1]=sst_ResultSet2.getString(1);// el index del getString en el resulset es 1
+            }                                                          //ya que la consulta 2 devuelve una sola columna
+            modelo.addRow(papus);// Se agrega la fila al modelo*/
+
+
+        while(sst_ResultSet2.next())
+            mio[0] = sst_ResultSet2.getString(1);
+        corona.addRow(mio);
+
+
+
+
+        //tabla.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        /*for (int i = 0; i < tabla.getColumnCount(); i++) {
+            DefaultTableColumnModel colModel = (DefaultTableColumnModel) tabla.getColumnModel();
+            TableColumn col = colModel.getColumn(i);
+            int width = 0;
+
+            TableCellRenderer renderer = col.getHeaderRenderer();
+            for (int r = 0; r < tabla.getRowCount(); r++) {
+                renderer = tabla.getCellRenderer(r, i);
+                Component comp = renderer.getTableCellRendererComponent(tabla, tabla.getValueAt(r, i),
+                        false, false, r, i);
+                width = Math.max(width, comp.getPreferredSize().width);
+            }
+            col.setPreferredWidth(width + 2);
+        }*/
+
+
+        //tabla.setPreferredScrollableViewportSize(new Dimension(800, 50));
+        tabla.setFillsViewportHeight(true);
+        //nico.setPreferredScrollableViewportSize(new Dimension(100, 20));
+        nico.setFillsViewportHeight(true);
+
+        JScrollPane scrollPane = new JScrollPane(tabla);
+        JScrollPane scrollPain = new JScrollPane(nico);
+
+        JPanel umi = new JPanel();
+        umi.setLayout(null);
+
+
+
+        JLabel ticket = new JLabel("Ticket");
+        ticket.setBounds(150,20,150,10);
+        JLabel cliente = new JLabel("Id cliente: "+mio[2]);
+        //cliente.setBounds(348,100,50,10);
+        cliente.setBounds(20,80,150,10);
+        JLabel cliente_2 = new JLabel("Nombre cliente: "+mio[3]);
+        cliente_2.setBounds(20,100,250,10);
+        JLabel fecha = new JLabel("Fecha: "+mio[1]);
+        //fecha.setBounds(310,40,150,10);
+        fecha.setBounds(20,40,150,10);
+        JLabel num_venta = new JLabel("No. Venta: "+no_venta);
+        //num_venta.setBounds(310,65,150,10);
+        num_venta.setBounds(20,60,150,10);
+        JLabel nozo = new JLabel("Total: "+mio[0]);
+        //nozo.setText(" "+mio[0]);
+        //nozo.setEditable(false);
+        //nozo.setBackground(Color.white);
+        //scrollPane.setBounds(5,40,300,400);
+        JLabel titulo = new JLabel("Productos adquiridos");
+        titulo.setBounds(105,130,150,10);
+        scrollPane.setBounds(20,150,300,200);
+        //nozo.setBounds(350,115,30,20);
+        nozo.setBounds(20,360,150,10);
+
+
+
+//Aquí se agregan las weas al panel
+        f_consultaventa.setPreferredSize(new Dimension(360,500));
+        f_consultaventa.getContentPane().add(umi);
+        umi.add(scrollPane);
+        umi.add(cliente);
+        umi.add(nozo);
+        umi.add(fecha);
+        umi.add(num_venta);
+        umi.add(titulo);
+        umi.add(cliente_2);
+        umi.add(ticket);
+        //f_consultaventa.getContentPane().add(scrollPane, BorderLayout.LINE_START);
+        //f_consultaventa.getContentPane().add(scrollPain);
+        f_consultaventa.pack();
+        f_consultaventa.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        f_consultaventa.setVisible(true);
+        f_consultaventa.addWindowListener(this);
+    }
+
+    public void actionPerformed (ActionEvent ae){
+        Connection db1;
+        com.intento2.interfazgrafica.ConsultaVentaARG cv = new com.intento2.interfazgrafica.ConsultaVentaARG();
+        db1=InterfazGrafica.database(InterfazGrafica.nombre_de_base_datos,"root","unlock");
+        JComboBox cb = (JComboBox)ae.getSource();
+        InterfazGrafica.number = (String)cb.getSelectedItem();
+        d_numventa.setVisible(false);
+        try {
+            cv.ConsultaVentaARG(db1, InterfazGrafica.number);
+            db1.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
